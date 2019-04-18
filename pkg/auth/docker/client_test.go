@@ -90,6 +90,7 @@ func (suite *DockerClientTestSuite) SetupSuite() {
 }
 
 func (suite *DockerClientTestSuite) TearDownSuite() {
+
 	// Move docker conf dir back if necessary
 	dockerDir := config.Dir()
 	if _, err := os.Stat(dockerDir + "_oras_backup"); !os.IsNotExist(err) {

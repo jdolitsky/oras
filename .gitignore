@@ -26,3 +26,5 @@ bin/
 dist/
 *.tar.gz
 vendor/
+.docker
+.docker_oras_backup

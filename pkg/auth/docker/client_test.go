@@ -103,17 +103,41 @@ func (suite *DockerClientTestSuite) TearDownSuite() {
 	os.RemoveAll(suite.TempTestDir)
 }
 
-func (suite *DockerClientTestSuite) Test_0_Login() {
+
+func (suite *DockerClientTestSuite) Test_0_Resolver() {
+	_, err := suite.Client.Resolver(newContext())
+	suite.Nil(err, "no error retrieving resolver")
+}
+
+func (suite *DockerClientTestSuite) Test_1_Login() {
 	var err error
 
 	err = suite.Client.Login(newContext(), suite.DockerRegistryHost, "oscar", "opponent")
 	suite.NotNil(err, "error logging into registry with invalid credentials")
 
+	err = suite.Client.Login(newContext(), suite.DockerRegistryHost, "", testPassword)
+	suite.NotNil(err, "error logging into registry with no username")
+
 	err = suite.Client.Login(newContext(), suite.DockerRegistryHost, testUsername, testPassword)
 	suite.Nil(err, "no error logging into registry with valid credentials")
 }
 
-func (suite *DockerClientTestSuite) Test_1_Logout() {
+func (suite *DockerClientTestSuite) Test_2_Credential() {
+	username, password, err := suite.Client.Credential(suite.DockerRegistryHost)
+	suite.Nil(err, "no error getting credentials")
+	suite.Equal(testUsername, username, "username matches")
+	suite.Equal(testPassword, password, "password matches")
+
+	username, password, err = suite.Client.Credential("mybadhost:54321")
+	suite.Nil(err, "no error getting credentials")
+	suite.Equal("", username, "username empty with unauthed host")
+	suite.Equal("", password, "password empty with unauthed host")
+
+	username, password, err = suite.Client.Credential("index.docker.io")
+	suite.Nil(err, "no error getting credentials")
+}
+
+func (suite *DockerClientTestSuite) Test_3_Logout() {
 	var err error
 
 	err = suite.Client.Logout(newContext(), "non-existing-host:42")
@@ -123,7 +147,7 @@ func (suite *DockerClientTestSuite) Test_1_Logout() {
 	suite.Nil(err, "no error logging out of registry")
 }
 
-func (suite *DockerClientTestSuite) Test_2_NewClient() {
+func (suite *DockerClientTestSuite) Test_4_NewClient() {
 	_, err := NewClient("/")
 	suite.NotNil(err, "error creating client with bad config path (root)")
 

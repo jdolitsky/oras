@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/cli/cli/config"
 	"github.com/docker/distribution/configuration"
 	"github.com/docker/distribution/registry"
 	_ "github.com/docker/distribution/registry/auth/htpasswd"
@@ -37,6 +38,17 @@ func newContext() context.Context {
 }
 
 func (suite *DockerClientTestSuite) SetupSuite() {
+	// Temporarily move docker conf dir (if exists)
+	dockerDir := config.Dir()
+	if _, err := os.Stat(dockerDir); !os.IsNotExist(err) {
+		err = os.Rename(dockerDir, dockerDir+"_oras_backup")
+		suite.Nil(err, "no error moving docker dir")
+
+		// Make empty docker dir
+		err = os.MkdirAll(dockerDir, 0700)
+		suite.Nil(err, "no error making empty docker dir")
+	}
+
 	tempDir, err := ioutil.TempDir("", "oras_auth_docker_test")
 	suite.Nil(err, "no error creating temp directory for test")
 	suite.TempTestDir = tempDir
@@ -78,6 +90,15 @@ func (suite *DockerClientTestSuite) SetupSuite() {
 }
 
 func (suite *DockerClientTestSuite) TearDownSuite() {
+	// Move docker conf dir back if necessary
+	dockerDir := config.Dir()
+	if _, err := os.Stat(dockerDir + "_oras_backup"); !os.IsNotExist(err) {
+		err = os.RemoveAll(dockerDir)
+		suite.Nil(err, "no error removing test docker dir")
+		err = os.Rename(dockerDir+"_oras_backup", dockerDir)
+		suite.Nil(err, "no error restoring docker dir")
+	}
+
 	os.RemoveAll(suite.TempTestDir)
 }
 
@@ -90,7 +111,8 @@ func (suite *DockerClientTestSuite) Test_0_Login() {
 	err = suite.Client.Login(newContext(), suite.DockerRegistryHost, testUsername, testPassword)
 	suite.Nil(err, "no error logging into registry with valid credentials")
 }
-func (suite *DockerClientTestSuite) Test_2_Logout() {
+
+func (suite *DockerClientTestSuite) Test_1_Logout() {
 	var err error
 
 	err = suite.Client.Logout(newContext(), "non-existing-host:42")
@@ -98,6 +120,30 @@ func (suite *DockerClientTestSuite) Test_2_Logout() {
 
 	err = suite.Client.Logout(newContext(), suite.DockerRegistryHost)
 	suite.Nil(err, "no error logging out of registry")
+}
+
+func (suite *DockerClientTestSuite) Test_2_NewClient() {
+	_, err := NewClient("/")
+	suite.NotNil(err, "error creating client with bad config path (root)")
+
+	_, err = NewClient()
+	suite.Nil(err, "no error with no config paths")
+
+	badConfigPath := filepath.Join(config.Dir(), "fake.json")
+	_, err = os.Create(badConfigPath)
+
+	err = os.Chmod(config.Dir(), 0400)
+	suite.Nil(err, "no error chmod test config file")
+	_, err = NewClient(badConfigPath)
+	suite.NotNil(err, "error with bad config paths, 0400 perms")
+
+	err = os.Chmod(config.Dir(), 0400)
+	suite.Nil(err, "no error chmod test docker dir")
+	_, err = NewClient()
+	suite.NotNil(err, "error when docker dir has bad perms")
+
+	err = os.Chmod(config.Dir(), 0700)
+	suite.Nil(err, "no error chmod test docker dir (back)")
 }
 
 func TestDockerClientTestSuite(t *testing.T) {

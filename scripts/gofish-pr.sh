@@ -13,11 +13,10 @@ VERSION="${VERSION#"v"}" # remove "v" from tag
 
 function get_checksum() {
     local platform="$1"
-    curl -LO https://github.com/deislabs/oras/releases/download/v${VERSION}/oras_${VERSION}_${platform}_amd64.tar.gz
-    mkdir -p ${platform}
-    tar -zxf oras_${VERSION}_*.tar.gz -C ${platform}
-    shasum -a 256 ${platform}/oras* | awk '{print $1}'
-    rm -rf oras_${VERSION}_*.tar.gz ${platform}
+    local tarball="oras_${VERSION}_${platform}_amd64.tar.gz"
+    curl -LO https://github.com/deislabs/oras/releases/download/v${VERSION}/${tarball}
+    shasum -a 256 ${tarball} | awk '{print $1}'
+    rm -rf ${tarball}
 }
 
 MAC_CHECKSUM="$(get_checksum darwin)"
